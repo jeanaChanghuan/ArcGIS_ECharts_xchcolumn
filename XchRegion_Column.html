@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+	 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	 <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no"/>
+	 <title>echarts ArcGISMap demo</title>
+	  <link rel="stylesheet" href="http://localhost:8090/arcgis_js_api/library/3.24/esri/css/esri.css">
+ 	  <link rel="stylesheet"  href="http://localhost:8090/arcgis_js_api/library/3.24/dijit/themes/claro/claro.css">
+     <script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
+       <style>
+      html, body, #map {
+        height: 100%;
+        margin: 0;
+      }
+      body{
+      	  background-color: #F5F3F0;
+      }
+    </style>
+</head>
+<body >
+	<!-- 为ECharts准备一个具备大小（宽高）的Dom -->
+	<div id="map" style="z-index: -9999;">
+	</div>
+	<script src="js/echarts.min.js"></script>
+	<script type="text/javascript" src="http://localhost:8090/arcgis_js_api/library/3.24/init.js"></script>
+  	   <script type="text/javascript">
+	  require([
+        "esri/map", 
+         "esri/layers/ArcGISDynamicMapServiceLayer", 
+        "esri/layers/ImageParameters",
+       	"esri/tasks/query","esri/tasks/QueryTask",
+       	 "esri/geometry/Point",
+        "dojo/domReady!"
+      ], function(
+         Map,ArcGISDynamicMapServiceLayer,ImageParameters,Query,QueryTask,Point
+      ) {
+		 var map = new Map("map");
+         dynamicMapServiceLayer = new ArcGISDynamicMapServiceLayer("http://localhost:6080/arcgis/rest/services/XCH/EzMap_XCH_BaseMap/MapServer", { 
+         id:"dynamicMapServiceLayer",
+          "opacity" : 1
+        }); 
+        map.addLayer(dynamicMapServiceLayer);
+        var HideMap = new ArcGISDynamicMapServiceLayer("http://localhost:6080/arcgis/rest/services/XCH/EzMap_XCH_BaseHide/MapServer",{
+				opacity : 1
+		}); 
+		map.addLayer(HideMap);
+		var RegionLayer = new ArcGISDynamicMapServiceLayer("http://localhost:6080/arcgis/rest/services/XCH/XCHKeyRegion/MapServer",{
+				opacity : 0.7
+		}); 
+		RegionLayer.setVisibleLayers([1]);
+ 		map.addLayer(RegionLayer);
+ 		queryRegionP();
+ 		function queryRegionP(){
+ 			var query = new Query();
+        	query.outFields = ["*"];
+        	query.where = "1 = 1";
+        	query.returnGeometry = true;
+        	var queryTask = new QueryTask(RegionLayer.url+"/0");
+			queryTask.execute(query, showRegionPResult, function(error) { 
+       			 			alert("地图服务调用失败：[" + error + "]");
+    	  				}); 		      	
+ 		}
+ 		function  showRegionPResult(results){
+			var resultCount = results.features.length;
+             if (resultCount > 0) {
+           	   for (var i = 0; i < resultCount; i++) {
+                       var obj=results.features[i].attributes;
+                        var x=results.features[i].geometry.x;
+                        var y=results.features[i].geometry.y;
+                        getCharts(x,y,obj);
+                  }
+             }
+ 		}
+		function getCharts(x,y,obj){
+				var point =new Point(x,y, map.spatialReference);
+	   	        var pointscreen=map.toScreen(point);
+	   	        var left=pointscreen.x-40;
+	   	        var top=pointscreen.y-80;
+				var divStr="<div  id=\"charts"+x+y+"\" style=\"height:160px;width:80px;position:absolute;left:"+left+"px;top: "+top+"px;z-index: 99;\" ></div>";
+				var divS = document.createElement("div");
+				divS.innerHTML = divStr;
+				document.getElementById("map").appendChild(divS);
+				var chartid="charts"+x+y;
+				var myChart=  echarts.init(document.getElementById(chartid));
+				option = {
+					 	grid: {
+					 		show:false
+					 	},
+					    tooltip: {
+						        trigger: "item",
+						        formatter: ""
+						    },
+			        
+					    xAxis: {
+					        type: 'category',
+					        splitLine:{show: false},
+					        data: ['旅游人口分析','节假日','周末','工昨日'],
+					         axisLabel:{
+					         	show:false
+					        },
+					         show:false
+					    },
+					    yAxis: {
+					        type: 'value',
+					        splitLine:{show: false},
+					        axisLabel:{
+					         	show:false
+					        },
+					         show:false
+					    },
+					    series: [
+					    {
+					    	name: obj.NAME,
+					        data: [120, 200, 150, 80],
+					        type: 'bar',
+				            itemStyle: {
+					            normal: {
+					                // 随机显示
+					                //color:function(d){return "#"+Math.floor(Math.random()*(256*256*256-1)).toString(16);}
+					              
+					                // 定制显示（按顺序）
+					                color: function(params) { 
+					                    var colorList = ['#C33531','#EFE42A','#64BD3D','#EE9201','#29AAE3', '#B74AE5','#0AAF9F','#E89589','#16A085','#4A235A','#C39BD3 ','#F9E79F','#BA4A00','#ECF0F1','#616A6B','#EAF2F8','#4A235A','#3498DB' ]; 
+					                    return colorList[params.dataIndex] 
+					                }
+					            }
+					        },
+					    }
+					    
+					    ]
+					};
+				 myChart.setOption(option); 
+			     mapZoom=dojo.connect(map,"onZoomEnd",dojo.hitch(this,showCoordinates,x,y));
+	             mapPan = dojo.connect(map,"onPanEnd",dojo.hitch(this,showCoordinates,x,y));
+			}
+			/**
+				监听地图放大平移时间，可将移动统计图位置，并控制街道和社区统计图的显示。
+			*/
+			function showCoordinates(x,y){
+   				  var point =new Point(x,y, map.spatialReference);
+	   	          var pointscreen=map.toScreen(point);
+	   	          var left=pointscreen.x-40;
+	   	          var top=pointscreen.y-80;
+	   	          var chartid="charts"+point.x+point.y;
+	   	          var div1 = document.getElementById(chartid); 
+		          div1.style.left=left+"px"; 
+		          div1.style.top=top+"px";
+			}
+	
+	
+	})
+	</script>
+</body>
+	
+</html>
