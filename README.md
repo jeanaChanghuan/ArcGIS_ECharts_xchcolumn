@@ -1,0 +1,2 @@
+# ArcGIS_ECharts_xchcolumn
+ECharts组件结合ArcGIS本地发布地图，实现北京市西城区人口二维柱状图
